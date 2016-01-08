@@ -1,0 +1,57 @@
+# Map 1-based optional input ports to variables
+dataset1 <- maml.mapInputPort(1) # class: data.frame
+# Preprocessing
+d1 = dataset1
+
+d1$ScreenTime = as.numeric(d1$ScreenTime)
+d1$TotalLines = as.numeric(d1$TotalLines)
+d1$Year.Born[is.null(d1$Year.Born)] = 0
+d1$Year.Born = as.numeric(d1$Year.Born)
+# Define variables 
+time = d1$ScreenTime
+event = d1$Status
+attach(d1)
+# library
+library(survival)
+# # Kaplan-Meier non-parametric analysis
+kmsurvival <- survfit(Surv(time,event) ~ 1)
+summary(kmsurvival)
+plot(kmsurvival, xlab="Time", ylab="Survival Probability",main="Kaplan-Meier estimate with 95% confidence bounds")
+
+g2<-d1$Gender
+# Kaplan-Meier non-parametric analysis by group
+kmsurvival2 <- survfit(Surv(time, event) ~ g2)
+summary(kmsurvival2)
+plot(kmsurvival2, xlab="Time", ylab="Survival Probability",main="Survival rate by Gender",col=2:1)
+legend("topright", legend=c("Male", "Female"),lty=1,col=1:2,bty="n")
+
+# Cox proportional hazard model - coefficients and hazard rates
+coxph = coxph(Surv(time,event) ~ as.factor(House)
+             + as.factor(Allegiance)
+             + OnPoster 
+             + Year.Born 
+             + as.factor(Gender)
+             + as.factor(Nobility) 
+             + TotalLines 
+             + as.factor(Religion) 
+             + as.factor(RegionofMap) 
+             + as.factor(BornAbroad)
+             + NumberOfEpisodes 
+             + First.episode.the.character.was.introduced
+             + First.season.character.was.seen
+             + Season.1.total.time 
+             + Season.2.total.time+ Season.3.total.time+ Season.4.total.time
+             + Season.5.total.time,data=d1)
+summary(coxph)
+
+#covariate group prediction at median and 95% confidence level
+#options(na.action=na.pass)
+res<-survfit(coxph,newdata= d1)
+#attaching with original dataframe
+d2<-cbind(d1,summary(res)$table)
+# create and order by Time to die only for alive characters
+d2$TimeToDie<-ifelse(d2$Status==0&d2$ScreenTime<d2$median,(d2$median-d2$ScreenTime),9999)
+d3<-d2[order(d2$TimeToDie),]
+
+# Select data.frame to be sent to the output Dataset port
+maml.mapOutputPort("d3");
